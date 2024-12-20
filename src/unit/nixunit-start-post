@@ -1,26 +1,25 @@
 #!/bin/sh
-set -e
+set -xe
 
 . NIXUNITS/bin/common.sh
 
 host_eval() {
-  echo "Host eval $1" >> "$LOG"
-  /bin/sh -c "$1" 2>> "$LOG"
+  echo "Host eval $1" >>"$LOG"
+  /bin/sh -c "$1" 2>>"$LOG"
 }
 
 nsenter_eval() {
-  echo "NS eval $1" >> "$LOG"
-  nsenter --target $NS_PID --mount --uts --ipc --net --pid -- /bin/sh -c "$1" 2>> "$LOG"
+  echo "NS eval $1" >>"$LOG"
+  nsenter --target $NS_PID --mount --uts --ipc --net --pid -- /bin/sh -c "$1" 2>>"$LOG"
 }
 
 LOG=$(log "$NAME")
 
-echo "[$(date)] - - - START POST - - - $NAME" >> "$LOG"
+echo "[$(date)] - - - START POST - - - $NAME" >>"$LOG"
 
 NS_PID=$(host_eval "ps --ppid $MAINPID -o pid h")
 
-if [ -z "$INTERFACE" ] && { { [ -n "$IP4" ] && [ -n "$HOST_IP4" ]; } || { [ -n "$IP6" ] && [ -n "$HOST_IP6" ]; }; }
-then
+if [ -z "$INTERFACE" ] && { { [ -n "$IP4" ] && [ -n "$HOST_IP4" ]; } || { [ -n "$IP6" ] && [ -n "$HOST_IP6" ]; }; }; then
   if_infos=$(nsenter_eval "ip -j link" | jq '.[] | select(.ifname != "lo")')
   host_interface_id=$(echo "$if_infos" | jq '.link_index')
   INTERFACE=$(echo "$if_infos" | jq -r '.ifname')
@@ -33,8 +32,7 @@ test -n "$IP4" && nsenter_eval "ip -4 a add $IP4 dev $INTERFACE"
 test -n "$IP6" && nsenter_eval "ip -6 a add $IP6 dev $INTERFACE"
 test -n "$INTERFACE" && nsenter_eval "ip link set dev $INTERFACE up"
 
-if test -n "$HOST_INTERFACE"
-then
+if test -n "$HOST_INTERFACE"; then
   if [ -n "$HOST_IP4" ]; then
     host_eval "ip -4 a add $HOST_IP4 dev $HOST_INTERFACE"
     nsenter_eval "ip -4 route add ${HOST_IP4} dev $INTERFACE"
@@ -51,4 +49,4 @@ else
   test -n "$IP6_ROUTE" && nsenter_eval "ip -6 route add default via $IP6_ROUTE dev $INTERFACE"
 fi
 
-echo "[$(date)] - - - END POST - - - $NAME" >> "$LOG"
+echo "[$(date)] - - - END POST - - - $NAME" >>"$LOG"
